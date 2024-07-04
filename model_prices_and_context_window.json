@@ -4588,5 +4588,15 @@
         "litellm_provider": "databricks",
         "mode": "embedding",
         "source": "https://www.databricks.com/product/pricing/foundation-model-serving"
+    },
+    "L3-8B-Stheno-v3.2": {
+        "max_tokens": 4096,
+        "max_input_tokens": 4096,
+        "max_output_tokens": 4096,
+        "input_cost_per_token": 0.0000002,
+        "output_cost_per_token": 0.0000005,
+        "litellm_provider": "self",
+        "mode": "chat",
+        "source": "https://www.tipten.com/"
     }
 }
