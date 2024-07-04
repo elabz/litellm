@@ -8,16 +8,23 @@ services:
     image: ghcr.io/berriai/litellm:main-stable
     ports:
       - "4000:4000" # Map the container port to the host, change the host port if necessary
+    networks:
+      - llms
+    volumes:
+      - ./proxy_server_config.yaml:/app/proxy_server_config.yaml
     environment:
         DATABASE_URL: "postgresql://postgres:example@db:5432/postgres"
         STORE_MODEL_IN_DB: "True" # allows adding models to proxy via UI
     env_file:
       - .env # Load local .env file
 
- 
+
   db:
     image: postgres
     restart: always
+    user: postgres
+    networks:
+      - llms
     environment:
       POSTGRES_PASSWORD: example
     healthcheck:
@@ -26,4 +33,6 @@ services:
       timeout: 5s
       retries: 10
 
-# ...rest of your docker-compose config if any
+networks:
+  llms:
+    external: true
