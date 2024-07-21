@@ -175,10 +175,12 @@ class LiteLLMRoutes(enum.Enum):
         "/chat/completions",
         "/v1/chat/completions",
         # completions
+        "/engines/{model}/completions",
         "/openai/deployments/{model}/completions",
         "/completions",
         "/v1/completions",
         # embeddings
+        "/engines/{model}/embeddings",
         "/openai/deployments/{model}/embeddings",
         "/embeddings",
         "/v1/embeddings",
@@ -202,6 +204,23 @@ class LiteLLMRoutes(enum.Enum):
         # files
         "/v1/files",
         "/files",
+        "/v1/files/{file_id}",
+        "/files/{file_id}",
+        "/v1/files/{file_id}/content",
+        "/files/{file_id}/content",
+        # assistants-related routes
+        "/assistants",
+        "/v1/assistants",
+        "/v1/assistants/{assistant_id}",
+        "/assistants/{assistant_id}",
+        "/threads",
+        "/v1/threads",
+        "/threads/{thread_id}",
+        "/v1/threads/{thread_id}",
+        "/threads/{thread_id}/messages",
+        "/v1/threads/{thread_id}/messages",
+        "/threads/{thread_id}/runs",
+        "/v1/threads/{thread_id}/runs",
         # models
         "/models",
         "/v1/models",
@@ -285,6 +304,7 @@ class LiteLLMRoutes(enum.Enum):
         "/routes",
         "/",
         "/health/liveliness",
+        "/health/liveness",
         "/health/readiness",
         "/test",
         "/config/yaml",
@@ -671,6 +691,10 @@ class UpdateUserRequest(GenerateRequestBase):
         return values
 
 
+class DeleteUserRequest(LiteLLMBase):
+    user_ids: List[str]  # required
+
+
 class NewCustomerRequest(LiteLLMBase):
     """
     Create a new customer, allocate a budget to them
@@ -862,6 +886,7 @@ class LiteLLM_TeamTable(TeamBase):
     budget_duration: Optional[str] = None
     budget_reset_at: Optional[datetime] = None
     model_id: Optional[int] = None
+    last_refreshed_at: Optional[float] = None
 
     model_config = ConfigDict(protected_namespaces=())
 
@@ -1214,6 +1239,9 @@ class LiteLLM_VerificationTokenView(LiteLLM_VerificationToken):
     end_user_rpm_limit: Optional[int] = None
     end_user_max_budget: Optional[float] = None
 
+    # Time stamps
+    last_refreshed_at: Optional[float] = None  # last time joint view was pulled from db
+
 
 class UserAPIKeyAuth(
     LiteLLM_VerificationTokenView
@@ -1315,6 +1343,7 @@ class LiteLLM_SpendLogs(LiteLLMBase):
     cache_hit: Optional[str] = "False"
     cache_key: Optional[str] = None
     request_tags: Optional[Json] = None
+    requester_ip_address: Optional[str] = None
 
 
 class LiteLLM_ErrorLogs(LiteLLMBase):
@@ -1506,6 +1535,7 @@ class SpendLogsMetadata(TypedDict):
     spend_logs_metadata: Optional[
         dict
     ]  # special param to log k,v pairs to spendlogs for a call
+    requester_ip_address: Optional[str]
 
 
 class SpendLogsPayload(TypedDict):
@@ -1530,6 +1560,7 @@ class SpendLogsPayload(TypedDict):
     request_tags: str  # json str
     team_id: Optional[str]
     end_user: Optional[str]
+    requester_ip_address: Optional[str]
 
 
 class SpanAttributes(str, enum.Enum):
@@ -1598,11 +1629,17 @@ class ProxyException(Exception):
         type: str,
         param: Optional[str],
         code: Optional[int],
+        headers: Optional[Dict[str, str]] = None,
     ):
         self.message = message
         self.type = type
         self.param = param
         self.code = code
+        if headers is not None:
+            for k, v in headers.items():
+                if not isinstance(v, str):
+                    headers[k] = str(v)
+        self.headers = headers or {}
 
         # rules for proxyExceptions
         # Litellm router.py returns "No healthy deployment available" when there are no deployments available
@@ -1634,3 +1671,9 @@ class SpendCalculateRequest(LiteLLMBase):
     model: Optional[str] = None
     messages: Optional[List] = None
     completion_response: Optional[dict] = None
+
+
+class ProxyErrorTypes(str, enum.Enum):
+    budget_exceeded = "budget_exceeded"
+    expired_key = "expired_key"
+    auth_error = "auth_error"

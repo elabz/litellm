@@ -4,6 +4,8 @@ import time
 import traceback
 from typing import List, Literal, Optional, Tuple, Union
 
+from pydantic import BaseModel
+
 import litellm
 import litellm._logging
 from litellm import verbose_logger
@@ -13,6 +15,12 @@ from litellm.litellm_core_utils.llm_cost_calc.google import (
 from litellm.litellm_core_utils.llm_cost_calc.google import (
     cost_per_token as google_cost_per_token,
 )
+from litellm.litellm_core_utils.llm_cost_calc.google import (
+    cost_router as google_cost_router,
+)
+from litellm.litellm_core_utils.llm_cost_calc.utils import _generic_cost_per_character
+from litellm.types.llms.openai import HttpxBinaryResponseContent
+from litellm.types.router import SPECIAL_MODEL_INFO_PARAMS
 from litellm.utils import (
     CallTypes,
     CostPerToken,
@@ -62,6 +70,23 @@ def cost_per_token(
     ### CUSTOM PRICING ###
     custom_cost_per_token: Optional[CostPerToken] = None,
     custom_cost_per_second: Optional[float] = None,
+    ### CALL TYPE ###
+    call_type: Literal[
+        "embedding",
+        "aembedding",
+        "completion",
+        "acompletion",
+        "atext_completion",
+        "text_completion",
+        "image_generation",
+        "aimage_generation",
+        "moderation",
+        "amoderation",
+        "atranscription",
+        "transcription",
+        "aspeech",
+        "speech",
+    ] = "completion",
 ) -> Tuple[float, float]:
     """
     Calculates the cost per token for a given model, prompt tokens, and completion tokens.
@@ -76,6 +101,7 @@ def cost_per_token(
         custom_llm_provider (str): The llm provider to whom the call was made (see init.py for full list)
         custom_cost_per_token: Optional[CostPerToken]: the cost per input + output token for the llm api call.
         custom_cost_per_second: Optional[float]: the cost per second for the llm api call.
+        call_type: Optional[str]: the call type
 
     Returns:
         tuple: A tuple containing the cost in USD dollars for prompt tokens and completion tokens, respectively.
@@ -136,22 +162,32 @@ def cost_per_token(
 
     # see this https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models
     print_verbose(f"Looking up model={model} in model_cost_map")
-    if custom_llm_provider == "vertex_ai" and "claude" in model:
-        return google_cost_per_token(
-            model=model_without_prefix,
-            custom_llm_provider=custom_llm_provider,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-        )
     if custom_llm_provider == "vertex_ai":
-        return google_cost_per_character(
+        cost_router = google_cost_router(
             model=model_without_prefix,
             custom_llm_provider=custom_llm_provider,
             prompt_characters=prompt_characters,
             completion_characters=completion_characters,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            call_type=call_type,
         )
+        if cost_router == "cost_per_character":
+            return google_cost_per_character(
+                model=model_without_prefix,
+                custom_llm_provider=custom_llm_provider,
+                prompt_characters=prompt_characters,
+                completion_characters=completion_characters,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+        elif cost_router == "cost_per_token":
+            return google_cost_per_token(
+                model=model_without_prefix,
+                custom_llm_provider=custom_llm_provider,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
     elif custom_llm_provider == "gemini":
         return google_cost_per_token(
             model=model_without_prefix,
@@ -159,6 +195,27 @@ def cost_per_token(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+    elif call_type == "speech" or call_type == "aspeech":
+        prompt_cost, completion_cost = _generic_cost_per_character(
+            model=model_without_prefix,
+            custom_llm_provider=custom_llm_provider,
+            prompt_characters=prompt_characters,
+            completion_characters=completion_characters,
+            custom_prompt_cost=None,
+            custom_completion_cost=0,
+        )
+        if prompt_cost is None or completion_cost is None:
+            raise ValueError(
+                "cost for tts call is None. prompt_cost={}, completion_cost={}, model={}, custom_llm_provider={}, prompt_characters={}, completion_characters={}".format(
+                    prompt_cost,
+                    completion_cost,
+                    model_without_prefix,
+                    custom_llm_provider,
+                    prompt_characters,
+                    completion_characters,
+                )
+            )
+        return prompt_cost, completion_cost
     elif model in model_cost_ref:
         print_verbose(f"Success: model={model} in model_cost_map")
         print_verbose(
@@ -289,7 +346,7 @@ def cost_per_token(
         return prompt_tokens_cost_usd_dollar, completion_tokens_cost_usd_dollar
     else:
         # if model is not in model_prices_and_context_window.json. Raise an exception-let users know
-        error_str = f"Model not in model_prices_and_context_window.json. You passed model={model}. Register pricing for model - https://docs.litellm.ai/docs/proxy/custom_pricing\n"
+        error_str = f"Model not in model_prices_and_context_window.json. You passed model={model}, custom_llm_provider={custom_llm_provider}. Register pricing for model - https://docs.litellm.ai/docs/proxy/custom_pricing\n"
         raise litellm.exceptions.NotFoundError(  # type: ignore
             message=error_str,
             model=model,
@@ -429,7 +486,10 @@ def completion_cost(
         prompt_characters = 0
         completion_tokens = 0
         completion_characters = 0
-        if completion_response is not None:
+        if completion_response is not None and (
+            isinstance(completion_response, BaseModel)
+            or isinstance(completion_response, dict)
+        ):  # tts returns a custom class
             # get input/output tokens from completion_response
             prompt_tokens = completion_response.get("usage", {}).get("prompt_tokens", 0)
             completion_tokens = completion_response.get("usage", {}).get(
@@ -535,6 +595,11 @@ def completion_cost(
                 raise Exception(
                     f"Model={image_gen_model_name} not found in completion cost model map"
                 )
+        elif (
+            call_type == CallTypes.speech.value or call_type == CallTypes.aspeech.value
+        ):
+            prompt_characters = litellm.utils._count_characters(text=prompt)
+
         # Calculate cost based on prompt_tokens, completion_tokens
         if (
             "togethercomputer" in model
@@ -591,6 +656,7 @@ def completion_cost(
             custom_cost_per_token=custom_cost_per_token,
             prompt_characters=prompt_characters,
             completion_characters=completion_characters,
+            call_type=call_type,
         )
         _final_cost = prompt_tokens_cost_usd_dollar + completion_tokens_cost_usd_dollar
         print_verbose(
@@ -608,6 +674,7 @@ def response_cost_calculator(
         ImageResponse,
         TranscriptionResponse,
         TextCompletionResponse,
+        HttpxBinaryResponseContent,
     ],
     model: str,
     custom_llm_provider: Optional[str],
@@ -641,7 +708,8 @@ def response_cost_calculator(
         if cache_hit is not None and cache_hit is True:
             response_cost = 0.0
         else:
-            response_object._hidden_params["optional_params"] = optional_params
+            if isinstance(response_object, BaseModel):
+                response_object._hidden_params["optional_params"] = optional_params
             if isinstance(response_object, ImageResponse):
                 response_cost = completion_cost(
                     completion_response=response_object,
@@ -651,12 +719,11 @@ def response_cost_calculator(
                 )
             else:
                 if (
-                    model in litellm.model_cost
-                    and custom_pricing is not None
-                    and custom_llm_provider is True
+                    model in litellm.model_cost or custom_pricing is True
                 ):  # override defaults if custom pricing is set
                     base_model = model
                 # base_model defaults to None if not set on model_info
+
                 response_cost = completion_cost(
                     completion_response=response_object,
                     call_type=call_type,
@@ -670,8 +737,8 @@ def response_cost_calculator(
         )
         return None
     except Exception as e:
-        verbose_logger.error(
-            "litellm.cost_calculator.py::response_cost_calculator - Exception occurred - {}/n{}".format(
+        verbose_logger.warning(
+            "litellm.cost_calculator.py::response_cost_calculator - Returning None. Exception occurred - {}/n{}".format(
                 str(e), traceback.format_exc()
             )
         )

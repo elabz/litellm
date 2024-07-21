@@ -32,6 +32,12 @@ class LangFuseLogger:
         self.langfuse_host = langfuse_host or os.getenv(
             "LANGFUSE_HOST", "https://cloud.langfuse.com"
         )
+        if not (
+            self.langfuse_host.startswith("http://")
+            or self.langfuse_host.startswith("https://")
+        ):
+            # add http:// if unset, assume communicating over private network - e.g. render
+            self.langfuse_host = "http://" + self.langfuse_host
         self.langfuse_release = os.getenv("LANGFUSE_RELEASE")
         self.langfuse_debug = os.getenv("LANGFUSE_DEBUG")
 
@@ -311,17 +317,22 @@ class LangFuseLogger:
 
         try:
             tags = []
-            new_metadata = {}
-            for key, value in metadata.items():
-                if (
-                    isinstance(value, list)
-                    or isinstance(value, dict)
-                    or isinstance(value, str)
-                    or isinstance(value, int)
-                    or isinstance(value, float)
-                ):
-                    new_metadata[key] = copy.deepcopy(value)
-            metadata = new_metadata
+            try:
+                metadata = copy.deepcopy(
+                    metadata
+                )  # Avoid modifying the original metadata
+            except:
+                new_metadata = {}
+                for key, value in metadata.items():
+                    if (
+                        isinstance(value, list)
+                        or isinstance(value, dict)
+                        or isinstance(value, str)
+                        or isinstance(value, int)
+                        or isinstance(value, float)
+                    ):
+                        new_metadata[key] = copy.deepcopy(value)
+                metadata = new_metadata
 
             supports_tags = Version(langfuse.version.__version__) >= Version("2.6.3")
             supports_prompt = Version(langfuse.version.__version__) >= Version("2.7.3")

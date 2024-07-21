@@ -605,15 +605,13 @@ def init_bedrock_client(
     ) = params_to_check
 
     ### SET REGION NAME
-    if region_name:
-        pass
-    elif aws_region_name:
-        region_name = aws_region_name
-    elif litellm_aws_region_name:
-        region_name = litellm_aws_region_name
-    elif standard_aws_region_name:
-        region_name = standard_aws_region_name
-    else:
+    region_name = (
+        litellm_aws_region_name  # prefer environment variables before inline region parameters
+        or standard_aws_region_name
+        or region_name
+        or aws_region_name
+    )
+    if not region_name:
         raise BedrockError(
             message="AWS region not set: set AWS_REGION_NAME or AWS_REGION env variable or in .env file",
             status_code=401,
@@ -1122,7 +1120,7 @@ def completion(
                             logging_obj=logging_obj,
                         )
 
-                model_response["finish_reason"] = map_finish_reason(
+                model_response.choices[0].finish_reason = map_finish_reason(
                     response_body["stop_reason"]
                 )
                 _usage = litellm.Usage(
@@ -1134,14 +1132,16 @@ def completion(
                 setattr(model_response, "usage", _usage)
             else:
                 outputText = response_body["completion"]
-                model_response["finish_reason"] = response_body["stop_reason"]
+                model_response.choices[0].finish_reason = response_body["stop_reason"]
         elif provider == "cohere":
             outputText = response_body["generations"][0]["text"]
         elif provider == "meta":
             outputText = response_body["generation"]
         elif provider == "mistral":
             outputText = response_body["outputs"][0]["text"]
-            model_response["finish_reason"] = response_body["outputs"][0]["stop_reason"]
+            model_response.choices[0].finish_reason = response_body["outputs"][0][
+                "stop_reason"
+            ]
         else:  # amazon titan
             outputText = response_body.get("results")[0].get("outputText")
 
@@ -1160,7 +1160,7 @@ def completion(
                     and getattr(model_response.choices[0].message, "tool_calls", None)
                     is None
                 ):
-                    model_response["choices"][0]["message"]["content"] = outputText
+                    model_response.choices[0].message.content = outputText
                 elif (
                     hasattr(model_response.choices[0], "message")
                     and getattr(model_response.choices[0].message, "tool_calls", None)
@@ -1199,8 +1199,8 @@ def completion(
             )
             setattr(model_response, "usage", usage)
 
-        model_response["created"] = int(time.time())
-        model_response["model"] = model
+        model_response.created = int(time.time())
+        model_response.model = model
 
         model_response._hidden_params["region_name"] = client.meta.region_name
         print_verbose(f"model_response._hidden_params: {model_response._hidden_params}")
@@ -1323,9 +1323,9 @@ def _embedding_func_single(
 def embedding(
     model: str,
     input: Union[list, str],
+    model_response: litellm.EmbeddingResponse,
     api_key: Optional[str] = None,
     logging_obj=None,
-    model_response=None,
     optional_params=None,
     encoding=None,
 ):
@@ -1391,9 +1391,9 @@ def embedding(
                 "embedding": embedding,
             }
         )
-    model_response["object"] = "list"
-    model_response["data"] = embedding_response
-    model_response["model"] = model
+    model_response.object = "list"
+    model_response.data = embedding_response
+    model_response.model = model
     input_tokens = 0
 
     input_str = "".join(input)

@@ -29,6 +29,7 @@ else:
 LITELLM_TRACER_NAME = os.getenv("OTEL_TRACER_NAME", "litellm")
 LITELLM_RESOURCE = {
     "service.name": os.getenv("OTEL_SERVICE_NAME", "litellm"),
+    "deployment.environment": os.getenv("OTEL_ENVIRONMENT_NAME", "production"),
 }
 RAW_REQUEST_SPAN_NAME = "raw_gen_ai_request"
 LITELLM_REQUEST_SPAN_NAME = "litellm_request"
@@ -51,6 +52,12 @@ class OpenTelemetryConfig:
 
         OTEL_HEADERS gets sent as headers = {"x-honeycomb-team": "B85YgLm96******"}
         """
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+            InMemorySpanExporter,
+        )
+
+        if os.getenv("OTEL_EXPORTER") == "in_memory":
+            return cls(exporter=InMemorySpanExporter())
         return cls(
             exporter=os.getenv("OTEL_EXPORTER", "console"),
             endpoint=os.getenv("OTEL_ENDPOINT"),
@@ -281,6 +288,11 @@ class OpenTelemetry(CustomLogger):
             )
             pass
 
+    def is_primitive(self, value):
+        if value is None:
+            return False
+        return isinstance(value, (str, bool, int, float))
+
     def set_attributes(self, span: Span, kwargs, response_obj):
         from litellm.proxy._types import SpanAttributes
 
@@ -289,6 +301,14 @@ class OpenTelemetry(CustomLogger):
 
         # https://github.com/open-telemetry/semantic-conventions/blob/main/model/registry/gen-ai.yaml
         # Following Conventions here: https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/llm-spans.md
+        #############################################
+        ############ LLM CALL METADATA ##############
+        #############################################
+        metadata = litellm_params.get("metadata", {}) or {}
+
+        for key, value in metadata.items():
+            if self.is_primitive(value):
+                span.set_attribute("metadata.{}".format(key), value)
 
         #############################################
         ########## LLM Request Attributes ###########
@@ -447,16 +467,25 @@ class OpenTelemetry(CustomLogger):
             # cast sr -> dict
             import json
 
-            _raw_response = json.loads(_raw_response)
-            for param, val in _raw_response.items():
-                if not isinstance(val, str):
-                    val = str(val)
-                span.set_attribute(
-                    f"llm.{custom_llm_provider}.{param}",
-                    val,
+            try:
+                _raw_response = json.loads(_raw_response)
+                for param, val in _raw_response.items():
+                    if not isinstance(val, str):
+                        val = str(val)
+                    span.set_attribute(
+                        f"llm.{custom_llm_provider}.{param}",
+                        val,
+                    )
+            except json.JSONDecodeError:
+                verbose_logger.debug(
+                    "litellm.integrations.opentelemetry.py::set_raw_request_attributes() - raw_response not json string - {}".format(
+                        _raw_response
+                    )
                 )
-
-        pass
+                span.set_attribute(
+                    f"llm.{custom_llm_provider}.stringified_raw_response",
+                    _raw_response,
+                )
 
     def _to_ns(self, dt):
         return int(dt.timestamp() * 1e9)

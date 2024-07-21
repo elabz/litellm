@@ -24,6 +24,7 @@ from litellm.proxy._types import (
     LitellmUserRoles,
     UserAPIKeyAuth,
 )
+from litellm.proxy.auth.auth_utils import is_openai_route
 from litellm.proxy.utils import PrismaClient, ProxyLogging, log_to_opentelemetry
 from litellm.types.services import ServiceLoggerPayload, ServiceTypes
 
@@ -58,7 +59,7 @@ def common_checks(
     6. [OPTIONAL] If 'litellm.max_budget' is set (>0), is proxy under budget
     """
     _model = request_body.get("model", None)
-    if team_object is not None and team_object.blocked == True:
+    if team_object is not None and team_object.blocked is True:
         raise Exception(
             f"Team={team_object.team_id} is blocked. Update via `/team/unblock` if your admin."
         )
@@ -105,7 +106,7 @@ def common_checks(
         general_settings.get("enforce_user_param", None) is not None
         and general_settings["enforce_user_param"] == True
     ):
-        if route in LiteLLMRoutes.openai_routes.value and "user" not in request_body:
+        if is_openai_route(route=route) and "user" not in request_body:
             raise Exception(
                 f"'user' param not passed in. 'enforce_user_param'={general_settings['enforce_user_param']}"
             )
@@ -121,7 +122,7 @@ def common_checks(
                 + CommonProxyErrors.not_premium_user.value
             )
 
-        if route in LiteLLMRoutes.openai_routes.value:
+        if is_openai_route(route=route):
             # loop through each enforced param
             # example enforced_params ['user', 'metadata', 'metadata.generation_name']
             for enforced_param in general_settings["enforced_params"]:
@@ -149,7 +150,7 @@ def common_checks(
         and global_proxy_spend is not None
         # only run global budget checks for OpenAI routes
         # Reason - the Admin UI should continue working if the proxy crosses it's global budget
-        and route in LiteLLMRoutes.openai_routes.value
+        and is_openai_route(route=route)
         and route != "/v1/models"
         and route != "/models"
     ):
@@ -348,6 +349,15 @@ async def get_user_object(
         )
 
 
+async def _cache_team_object(
+    team_id: str,
+    team_table: LiteLLM_TeamTable,
+    user_api_key_cache: DualCache,
+):
+    key = "team_id:{}".format(team_id)
+    await user_api_key_cache.async_set_cache(key=key, value=team_table)
+
+
 @log_to_opentelemetry
 async def get_team_object(
     team_id: str,
@@ -385,7 +395,9 @@ async def get_team_object(
 
         _response = LiteLLM_TeamTable(**response.dict())
         # save the team object to cache
-        await user_api_key_cache.async_set_cache(key=key, value=_response)
+        await _cache_team_object(
+            team_id=team_id, team_table=_response, user_api_key_cache=user_api_key_cache
+        )
 
         return _response
     except Exception as e:

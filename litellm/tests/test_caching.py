@@ -1579,18 +1579,21 @@ async def test_redis_semantic_cache_acompletion():
     assert response1.id == response2.id
 
 
-def test_caching_redis_simple(caplog):
+def test_caching_redis_simple(caplog, capsys):
     """
     Relevant issue - https://github.com/BerriAI/litellm/issues/4511
     """
+    litellm.set_verbose = True  ## REQUIRED FOR TEST.
     litellm.cache = Cache(
         type="redis", url=os.getenv("REDIS_SSL_URL")
     )  # passing `supported_call_types = ["completion"]` has no effect
 
     s = time.time()
+
+    uuid_str = str(uuid.uuid4())
     x = completion(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": "Hello, how are you? Wink"}],
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": f"Hello, how are you? Wink {uuid_str}"}],
         stream=True,
     )
     for m in x:
@@ -1599,15 +1602,30 @@ def test_caching_redis_simple(caplog):
 
     s2 = time.time()
     x = completion(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": "Hello, how are you? Wink"}],
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": f"Hello, how are you? Wink {uuid_str}"}],
         stream=True,
     )
     for m in x:
         print(m)
     print(time.time() - s2)
 
+    redis_async_caching_error = False
+    redis_service_logging_error = False
+    captured = capsys.readouterr()
     captured_logs = [rec.message for rec in caplog.records]
 
-    assert "LiteLLM Redis Caching: async set" not in captured_logs
-    assert "ServiceLogging.async_service_success_hook" not in captured_logs
+    print(f"captured_logs: {captured_logs}")
+    for item in captured_logs:
+        if (
+            "Error connecting to Async Redis client" in item
+            or "Set ASYNC Redis Cache" in item
+        ):
+            redis_async_caching_error = True
+
+        if "ServiceLogging.async_service_success_hook" in item:
+            redis_service_logging_error = True
+
+    assert redis_async_caching_error is False
+    assert redis_service_logging_error is False
+    assert "async success_callback: reaches cache for logging" not in captured.out

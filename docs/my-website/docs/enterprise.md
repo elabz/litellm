@@ -7,6 +7,15 @@ Interested in Enterprise? Schedule a meeting with us here 👉
 
 :::
 
+Deploy managed LiteLLM Proxy within your VPC.
+
+Includes all enterprise features.
+
+[**View AWS Marketplace Listing**](https://aws.amazon.com/marketplace/pp/prodview-gdm3gswgjhgjo?sr=0-1&ref_=beagle&applicationId=AWSMPContessa)
+
+[**Get early access**](https://calendly.com/d/4mp-gd3-k5k/litellm-1-1-onboarding-chat)
+
+
 This covers: 
 - **Enterprise Features**
     - **Security**
@@ -15,7 +24,10 @@ This covers:
         - ✅ [JWT-Auth](../docs/proxy/token_auth.md)
         - ✅ [Control available public, private routes](./proxy/enterprise#control-available-public-private-routes)
         - ✅ [[BETA] AWS Key Manager v2 - Key Decryption](./proxy/enterprise#beta-aws-key-manager---key-decryption)
+        - ✅ IP address‑based access control lists
+        - ✅ Track Request IP Address
         - ✅ [Use LiteLLM keys/authentication on Pass Through Endpoints](./proxy/pass_through#✨-enterprise---use-litellm-keysauthentication-on-pass-through-endpoints)
+        - ✅ Set Max Request / File Size on Requests
         - ✅ [Enforce Required Params for LLM Requests (ex. Reject requests missing ["metadata"]["generation_name"])](./proxy/enterprise#enforce-required-params-for-llm-requests)
     - **Spend Tracking**
         - ✅ [Tracking Spend for Custom Tags](./proxy/enterprise#tracking-spend-for-custom-tags)
@@ -36,15 +48,6 @@ This covers:
 - ✅ **Professional Support - Dedicated discord + slack**
 
 
-
-
-## [COMING SOON] AWS Marketplace Support
-
-Deploy managed LiteLLM Proxy within your VPC.
-
-Includes all enterprise features.
-
-[**Get early access**](https://calendly.com/d/4mp-gd3-k5k/litellm-1-1-onboarding-chat)
 
 ## Frequently Asked Questions
 
