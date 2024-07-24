@@ -54,7 +54,7 @@ general_settings:
   proxy_batch_write_at: 1
   database_connection_pool_limit: 10
 #  database_url: "postgresql://<user>:<password>@<host>:<port>/<dbname>" # [OPTIONAL] use for token-based auth to proxy
-  database_url: "postgresql://postgres:example@db:5432/postgres" # [OPTIONAL] use for token-based auth to proxy
+  database_url: "postgresql://llmproxy:dbpassword9090@db:5432/litellm" # [OPTIONAL] use for token-based auth to proxy
 
 # environment_variables:
   # settings for using redis caching
