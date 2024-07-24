@@ -43,4 +43,5 @@ services:
 
 networks:
   llms:
+    name: llms
 # ...rest of your docker-compose config if any
