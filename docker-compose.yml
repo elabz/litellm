@@ -59,7 +59,6 @@ volumes:
   prometheus_data:
     driver: local
 
-
 networks:
   llms:
-    name: llms
+    external: true
