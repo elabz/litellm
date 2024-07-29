@@ -76,6 +76,10 @@ BEDROCK_CONVERSE_MODELS = [
     "anthropic.claude-v1",
     "anthropic.claude-instant-v1",
     "ai21.jamba-instruct-v1:0",
+    "meta.llama3-1-8b-instruct-v1:0",
+    "meta.llama3-1-70b-instruct-v1:0",
+    "meta.llama3-1-405b-instruct-v1:0",
+    "mistral.mistral-large-2407-v1:0",
 ]
 
 
@@ -241,7 +245,7 @@ async def make_call(
         return completion_stream
     except httpx.HTTPStatusError as err:
         error_code = err.response.status_code
-        raise BedrockError(status_code=error_code, message=str(err))
+        raise BedrockError(status_code=error_code, message=err.response.text)
     except httpx.TimeoutException as e:
         raise BedrockError(status_code=408, message="Timeout error occurred.")
     except Exception as e:
@@ -1313,6 +1317,7 @@ class AmazonConverseConfig:
             model.startswith("anthropic")
             or model.startswith("mistral")
             or model.startswith("cohere")
+            or model.startswith("meta.llama3-1")
         ):
             supported_params.append("tools")
 
@@ -1729,7 +1734,7 @@ class BedrockConverseLLM(BaseLLM):
         headers={},
         client: Optional[AsyncHTTPHandler] = None,
     ) -> Union[ModelResponse, CustomStreamWrapper]:
-        if client is None:
+        if client is None or not isinstance(client, AsyncHTTPHandler):
             _params = {}
             if timeout is not None:
                 if isinstance(timeout, float) or isinstance(timeout, int):
