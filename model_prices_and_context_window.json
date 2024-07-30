@@ -4719,7 +4719,7 @@
         "mode": "embedding",
         "source": "https://www.databricks.com/product/pricing/foundation-model-serving"
     },
-    "models/L3-8B-Stheno-v3.2-Q5_K_M-imat.gguf": {
+    "openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf": {
         "max_tokens": 4096,
         "max_input_tokens": 4096,
         "max_output_tokens": 4096,
