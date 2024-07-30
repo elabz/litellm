@@ -1,54 +1,54 @@
 model_list:
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama1:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama2:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama3:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama4:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama5:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama6:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
       api_base: http://llama7:8080
       stream_timeout: 0.001
       rpm: 100
-  - model_name: L3-8B-Stheno-v3.2
+  - model_name: L3-8B-Stheno-v3.3-32K
     litellm_params:
       model: openai/models/L3-8B-Stheno-v3.3-32K-Q5_K_M-imat.gguf
       api_key: sk-1234
